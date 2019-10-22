@@ -2,11 +2,18 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
-      "name": "myblob",
-      "type": "blobTrigger",
+      "authLevel": "function",
+      "type": "httpTrigger",
       "direction": "in",
-      "path": "data/{name}",
-      "connection": "AzureStorage"
+      "name": "req",
+      "methods": [
+        "get"
+      ]
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
     }
   ]
 }
