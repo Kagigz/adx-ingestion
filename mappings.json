@@ -1,0 +1,8 @@
+{
+    "TrafficFlows":
+    {
+        "format":"csv",
+        "ingestionMapping":"TrafficFlows_CSV_Mapping",
+        "table":"TrafficFlows"
+    }
+}

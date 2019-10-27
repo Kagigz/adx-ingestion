@@ -13,30 +13,34 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     logging.info('IngestionTrigger function processed a request.')
 
-    BLOB_ACCOUNT_NAME = os.environ['STORAGE_ACCOUNT_NAME']
-    BLOB_ACCOUNT_KEY = os.environ['STORAGE_ACCOUNT_KEY']
+    STORAGE_NAME = os.environ['STORAGE_ACCOUNT_NAME']
+    STORAGE_KEY = os.environ['STORAGE_ACCOUNT_KEY']
     SAS_TOKEN = os.environ['STORAGE_SAS_TOKEN']
     CONTAINER = os.environ['DATA_CONTAINER']
     STATUS_TABLE = os.environ['STATUS_TABLE']
     OPERATIONS_TABLE = os.environ['OPERATIONS_TABLE']
     UPLOAD_QUEUE = os.environ['UPLOAD_QUEUE']
 
-    blobService = storage_helpers.createBlobService(BLOB_ACCOUNT_NAME,BLOB_ACCOUNT_KEY)
+    blobService = storage_helpers.createBlobService(STORAGE_NAME,STORAGE_KEY)
+    queueService = storage_helpers.createQueueService(STORAGE_NAME,STORAGE_KEY)
 
-    if(blobService != None):
+    if(blobService != None and queueService != None):
 
         print("OK")
         blobGenerator = storage_helpers.listBlobs(blobService,CONTAINER)        
         # creating a blob list
-        blobs = storage_helpers.generateBlobList(blobGenerator,CONTAINER,BLOB_ACCOUNT_NAME,SAS_TOKEN)
+        blobs = storage_helpers.generateBlobList(blobGenerator,CONTAINER,STORAGE_NAME,SAS_TOKEN)
         blobsToIngest = []
 
         for blob in blobs:
-            #status = ingestBlob['status']
+            #TODO: Check status of blob
+            #status = blob['status']
             status = "NotFound"
             # If the blob was never ingested or the ingestion failed, we want to ingest it
             if(status == 'NotFound' or status == 'failure'):
                 blobsToIngest.append(blob)
+                storage_helpers.addToQueue(queueService,UPLOAD_QUEUE,storage_helpers.createQueueMessage(blob))
+                #TODO: update status of blob to "queued"
             
         logging.info("%d blobs found in %s" % (len(blobs),CONTAINER))
         logging.info("%d blobs to ingest in %s" % (len(blobsToIngest),CONTAINER))
@@ -45,6 +49,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         #TODO: put message in queue with blob path
         #TODO: Update operations table with new operation ID
 
+    else:
+        logging.error("Could not process the request.")
 
     if blobService:
         return func.HttpResponse(f"OK",status_code=200)

@@ -3,8 +3,7 @@ from azure.kusto.data.request import KustoClient, KustoConnectionStringBuilder
 from azure.kusto.data.exceptions import KustoServiceError
 from azure.kusto.data.helpers import dataframe_from_result_table
 from azure.kusto.ingest.status import KustoIngestStatusQueues
-
-
+import json
 import logging
 
 def createKustoConnection(uri, tenantID, appID, appKey):
@@ -22,6 +21,15 @@ def getKustoClient(kcsb):
     except:
         logging.error("Could not initialize Kusto Client.")
     return client
+
+def getMappingsBlob(blobName,filePath):
+    try:
+        with open(filePath, 'r') as f:
+            mappings = json.load(f)
+        namePattern = blobName.split('-')[0]
+        return (mappings[namePattern]["format"], mappings[namePattern]["ingestionMapping"], mappings[namePattern]["table"])
+    except Exception as e:
+        logging.error("Error mapping file name to format, table and ingestion mapping: %s"%e)
 
 def ingestBlob(client,db,blob,properties):
     INGESTION_PROPERTIES = IngestionProperties(database=db, table=blob['table'], dataFormat=DataFormat(blob['format']), mappingReference=blob['ingestionMapping'], additionalProperties=properties, reportLevel=ReportLevel.FailuresAndSuccesses)

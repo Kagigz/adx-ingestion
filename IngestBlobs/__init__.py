@@ -1,12 +1,13 @@
 import logging
 import os
 import azure.functions as func
+import json
 
 from ..shared_code import kusto_helpers
 from ..shared_code import storage_helpers
 from ..shared_code import request_helpers
 
-def main(req: func.HttpRequest) -> func.HttpResponse:
+def main(msg: func.QueueMessage):
     logging.info('IngestBlobs function processed a request.')
 
     INGEST_URI = os.environ['KUSTO_INGEST_URI']
@@ -14,40 +15,27 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     AAD_TENANT_ID = os.environ['AAD_TENANT_ID']
     APPLICATION_ID = os.environ['APPLICATION_ID']
     APPLICATION_SECRET = os.environ['APPLICATION_SECRET']
+    MAPPINGS_FILE = os.environ['MAPPINGS_FILE']
+
+    blobToIngest = None
+    try:
+        blobToIngest = storage_helpers.createBlobFromMessage(msg.get_body())
+        logging.info("Ingesting blob: %s"%str(blobToIngest))
+    except Exception as e:
+        logging.error("Could not get blobToIngest from queue message: %s"%e)
+    
 
     ingestKCSB = kusto_helpers.createKustoConnection(INGEST_URI,AAD_TENANT_ID, APPLICATION_ID, APPLICATION_SECRET)
-
     kustoClient = None
     if(ingestKCSB != None):
         kustoClient = kusto_helpers.getKustoClient(ingestKCSB)
 
-    blobList = []
-    table = ""
+    if(kustoClient != None and blobToIngest != None):
 
-    try:
-        req_body = req.get_json()
-        blobList = req_body['blobList']
-        table = req_body['table']
-    except:
-        logging.error("Could not request body.")
+        blobToIngest['format'],blobToIngest['ingestionMapping'],blobToIngest['table'] = kusto_helpers.getMappingsBlob(blobToIngest['name'],MAPPINGS_FILE)
+        logging.info('Queuing blob %s for ingestion to table %s'%(blobToIngest['name'],blobToIngest['table']))
+        additionalProperties = {'ignoreFirstRecord': 'true'}
+        kusto_helpers.ingestBlob(kustoClient,DATABASE,blobToIngest,additionalProperties)
+               
+        #TODO: update the storage table with status 'ingested'
 
-    if(kustoClient != None and len(blobList) > 0):
-
-        for blob in blobList:
-
-            if(table != '' and blob['table'] == table):
-
-                logging.info('Queuing blob %s'%blob['name'])
-                additionalProperties = {'ignoreFirstRecord': 'true'}
-                kusto_helpers.ingestBlob(kustoClient,DATABASE,blob,additionalProperties)
-                logging.info('Done queuing up ingestion with Azure Data Explorer')
-                
-                #TODO: update the storage table with new status
-
-    if kustoClient:
-        return func.HttpResponse(f"OK",status_code=200)
-    else:
-        return func.HttpResponse(
-             "Error",
-             status_code=400
-        )
