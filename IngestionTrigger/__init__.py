@@ -7,7 +7,6 @@ import json
 import pathlib
 
 from ..shared_code import storage_helpers
-from ..shared_code import request_helpers
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
 
@@ -18,13 +17,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     SAS_TOKEN = os.environ['STORAGE_SAS_TOKEN']
     CONTAINER = os.environ['DATA_CONTAINER']
     STATUS_TABLE = os.environ['STATUS_TABLE']
-    OPERATIONS_TABLE = os.environ['OPERATIONS_TABLE']
     UPLOAD_QUEUE = os.environ['UPLOAD_QUEUE']
 
     blobService = storage_helpers.createBlobService(STORAGE_NAME,STORAGE_KEY)
     queueService = storage_helpers.createQueueService(STORAGE_NAME,STORAGE_KEY)
+    tableService = storage_helpers.createTableService(STORAGE_NAME,STORAGE_KEY)
 
-    if(blobService != None and queueService != None):
+    if(blobService != None and queueService != None and tableService != None):
 
         print("OK")
         blobGenerator = storage_helpers.listBlobs(blobService,CONTAINER)        
@@ -33,24 +32,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         blobsToIngest = []
 
         for blob in blobs:
-            #TODO: Check status of blob
-            #status = blob['status']
+            # Check if blob was already ingested or not with the status table
+            # The partition key is the container name and the row key is the blob name 
             status = "NotFound"
+            blobStatus = storage_helpers.queryEntity(tableService,STATUS_TABLE,CONTAINER,blob['name'])
+            if(blobStatus != None):
+                status = blobStatus
             # If the blob was never ingested or the ingestion failed, we want to ingest it
             if(status == 'NotFound' or status == 'failure'):
                 blobsToIngest.append(blob)
                 storage_helpers.addToQueue(queueService,UPLOAD_QUEUE,storage_helpers.createQueueMessage(blob))
-                #TODO: update status of blob to "queued"
+                # Update status of blob to "queued"
+                newBlobStatus = {'PartitionKey': CONTAINER, 'RowKey': blob['name'], 'status' : 'queued'}
+                storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
             
         logging.info("%d blobs found in %s" % (len(blobs),CONTAINER))
         logging.info("%d blobs to ingest in %s" % (len(blobsToIngest),CONTAINER))
 
-        #if(len(blobsToIngest) > 0):
-        #TODO: put message in queue with blob path
-        #TODO: Update operations table with new operation ID
-
     else:
-        logging.error("Could not process the request.")
+        logging.warning("Could not trigger the ingestion process.")
 
     if blobService:
         return func.HttpResponse(f"OK",status_code=200)

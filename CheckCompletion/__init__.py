@@ -6,12 +6,11 @@ import json
 
 from ..shared_code import kusto_helpers
 from ..shared_code import storage_helpers
-from ..shared_code import request_helpers
 
 def main(mytimer: func.TimerRequest) -> None:
+
     logging.info('CheckCompletion function processed a request.')
     utc_timestamp = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
-
     if mytimer.past_due:
         logging.info('The timer is past due!')
 
@@ -19,15 +18,22 @@ def main(mytimer: func.TimerRequest) -> None:
     AAD_TENANT_ID = os.environ['AAD_TENANT_ID']
     APPLICATION_ID = os.environ['APPLICATION_ID']
     APPLICATION_SECRET = os.environ['APPLICATION_SECRET']
+    STORAGE_NAME = os.environ['STORAGE_ACCOUNT_NAME']
+    STORAGE_KEY = os.environ['STORAGE_ACCOUNT_KEY']
+    STATUS_TABLE = os.environ['STATUS_TABLE']
 
     ingestKCSB = kusto_helpers.createKustoConnection(INGEST_URI,AAD_TENANT_ID, APPLICATION_ID, APPLICATION_SECRET)
+
+    tableService = storage_helpers.createTableService(STORAGE_NAME,STORAGE_KEY)
 
     kustoClient = None
     if(ingestKCSB != None):
         kustoClient = kusto_helpers.getKustoClient(ingestKCSB)
-        if(kustoClient != None):
-            statusQueue = kusto_helpers.getStatusQueue(kustoClient)
-            if(statusQueue != None):
+        statusQueue = kusto_helpers.getStatusQueue(kustoClient)
+
+        if(kustoClient != None and tableService != None and statusQueue != None):
+
+                # Checking success queue to see if ingestion of blobs succeeded
                 if(kusto_helpers.isQueueEmpty(statusQueue.success) == True):
                     logging.info("Ingestion success queue is empty.")
                 else:
@@ -39,17 +45,24 @@ def main(mytimer: func.TimerRequest) -> None:
                         print("Success Message: ")
                         print(successMessage)
                         blobName, containerName = kusto_helpers.getBlobInfo(successMessage.IngestionSourcePath)
-                        #TODO: Update status table with success status
+                        # Update status table with success status
+                        newBlobStatus = {'PartitionKey': containerName, 'RowKey': blobName, 'status' : 'success'}
+                        storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
 
-
+                # Checking failure queue to see if ingestion failed for some blobs
                 if(kusto_helpers.isQueueEmpty(statusQueue.failure) == False):
-                    logging.info("There are new messages in the Ingestion failure queue.")
+                    logging.warning("There are new messages in the Ingestion failure queue.")
                     failureMessagesList = kusto_helpers.emptyQueue(statusQueue.failure)
 
                     # updating the blobs whose ingestion failed
                     for failureMessage in failureMessagesList:
                         blobName, containerName = kusto_helpers.getBlobInfo(failureMessage.IngestionSourcePath)
-                        #TODO: Update status table with failure status
+                        # Update status table with failure status
+                        newBlobStatus = {'PartitionKey': containerName, 'RowKey': blobName, 'status' : 'failure'}
+                        storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
+        
+        else:
+            logging.warning("Could not check if ingestion was completed.")
         
 
     logging.info('Python timer trigger function ran at %s', utc_timestamp)
