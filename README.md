@@ -57,7 +57,7 @@ These are the environment variables you should configure before running this app
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "python",
     "AzureWebJobsStorage": "<FUNCTIONS_STORAGE_CONNECTION_STRING>",
-    "MyStorage": "<GENERAL_STORAGE_CONNECTION_STRING>",
+    "AzureStorage": "<GENERAL_STORAGE_CONNECTION_STRING>",
     "AAD_TENANT_ID": "<YOUR_TENANT_ID>",
     "APPLICATION_ID": "<SERVICE_PRINCIPAL_APP_ID>",
     "APPLICATION_SECRET": "<SERVICE_PRINCIPAL_APP_SECRET>",
