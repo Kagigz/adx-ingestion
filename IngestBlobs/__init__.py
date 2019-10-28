@@ -2,6 +2,7 @@ import logging
 import os
 import azure.functions as func
 import json
+from pathlib import Path
 
 from ..shared_code import kusto_helpers
 from ..shared_code import storage_helpers
@@ -21,6 +22,9 @@ def main(msg: func.QueueMessage):
     CONTAINER = os.environ['DATA_CONTAINER']
     STATUS_TABLE = os.environ['STATUS_TABLE']
 
+    pathMappings = os.path.join(Path.cwd(),MAPPINGS_FILE)
+    logging.info("Mappings file path: %s"%pathMappings)
+
     blobToIngest = None
     try:
         blobToIngest = storage_helpers.createBlobFromMessage(msg.get_body())
@@ -38,7 +42,7 @@ def main(msg: func.QueueMessage):
     if(kustoClient != None and blobToIngest != None and tableService != None):
 
         # Ingest blob in ADX
-        blobToIngest['format'],blobToIngest['ingestionMapping'],blobToIngest['table'] = kusto_helpers.getMappingsBlob(blobToIngest['name'],MAPPINGS_FILE)
+        blobToIngest['format'],blobToIngest['ingestionMapping'],blobToIngest['table'] = kusto_helpers.getMappingsBlob(blobToIngest['name'],pathMappings)
         logging.info('Queuing blob %s for ingestion to table %s'%(blobToIngest['name'],blobToIngest['table']))
         additionalProperties = {'ignoreFirstRecord': 'true'}
         kusto_helpers.ingestBlob(kustoClient,DATABASE,blobToIngest,additionalProperties)
