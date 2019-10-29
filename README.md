@@ -45,7 +45,8 @@ CREATE_MAPPING_COMMAND = """.create table TrafficFlows ingestion csv mapping 'Tr
 - Configure app settings (see below)
 - Publish the code to your Function app
 
-**Note:** If you don't want to use the sample data in this repo, and have your own data and own tables/ingestion mappings, you can edit the *mappings.json* file. The naming pattern for your data should be <NAME>-****. In the mappings file, you can then specify the format, destination table and ingestion mapping corresponding to each name.
+**Note:** If you don't want to use the sample data in this repo, and have your own data and own tables/ingestion mappings, you can edit the *mappings.json* file. The naming pattern for your data should be `<NAME>-****`. 
+In the mappings file, you can specify the format, destination table and ingestion mapping corresponding to each name.
 
 ### App settings
 
