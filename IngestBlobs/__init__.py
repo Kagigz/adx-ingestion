@@ -22,9 +22,6 @@ def main(msg: func.QueueMessage):
     CONTAINER = os.environ['DATA_CONTAINER']
     STATUS_TABLE = os.environ['STATUS_TABLE']
 
-    path_mappings = os.path.abspath(os.path.join(os.path.dirname("__init__.py"), MAPPINGS_FILE))
-    logging.info("Mappings file path: %s"%path_mappings)
-
     blob_to_ingest = None
     try:
         blob_to_ingest = storage_helpers.create_blob_from_message(msg.get_body())
@@ -38,11 +35,17 @@ def main(msg: func.QueueMessage):
         kusto_client = kusto_helpers.get_kusto_client(ingest_KCSB)
 
     table_service = storage_helpers.create_table_service(STORAGE_NAME,STORAGE_KEY)
+    blob_service = storage_helpers.create_blob_service(STORAGE_NAME,STORAGE_KEY)
+
+    # Retrieving mappings file from blob storage
+    local_mappings_file = "mappings.json"
+    if(blob_service != None):
+        storage_helpers.get_blob(blob_service,MAPPINGS_FILE,local_mappings_file)
 
     if(kusto_client != None and blob_to_ingest != None and table_service != None):
 
         # Ingest blob in ADX
-        blob_to_ingest['format'],blob_to_ingest['ingestionMapping'],blob_to_ingest['table'] = kusto_helpers.get_mappings_blob(blob_to_ingest['name'],path_mappings)
+        blob_to_ingest['format'],blob_to_ingest['ingestionMapping'],blob_to_ingest['table'] = kusto_helpers.get_mappings_blob(blob_to_ingest['name'],local_mappings_file)
         logging.info('Queuing blob %s for ingestion to table %s'%(blob_to_ingest['name'],blob_to_ingest['table']))
         additional_properties = {'ignoreFirstRecord': 'true'}
         kusto_helpers.ingest_blob(kusto_client,DATABASE,blob_to_ingest,additional_properties)

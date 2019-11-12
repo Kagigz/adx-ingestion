@@ -33,6 +33,25 @@ def list_blobs(blob_service, container_name):
         logging.error("Could not list blobs in container %s: %s"%(container_name,e))
     return generator
 
+def get_blob(blob_service, file_path, local_path):
+    blob_name = None
+    try:
+        path = file_path.split('/')
+        container_name = path[0]
+        blob_name = path[1]
+    except Exception as e:
+        logging.error("Error reading blob path %s: %s"%(file_path,e))
+    blob = None
+    if(blob_name != None):
+        try:
+            blob = blob_service.get_blob_to_path(container_name, blob_name, local_path)
+            logging.info("File %s successfully retrieved from blob storage."%blob_name)
+        except Exception as e:
+            logging.error("Error retrieving file %s from blob storage: %s"%(blob_name,e))
+    return blob
+
+
+
 # Creates a list of blob objects with name, path and size
 def generate_blob_list(generator,container_name,account_name,sas_token):
     blobs = []
