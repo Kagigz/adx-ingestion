@@ -8,16 +8,16 @@ from azure.kusto.data.helpers import dataframe_from_result_table
 from azure.kusto.ingest.status import KustoIngestStatusQueues
 
 # Instantiate connection with ADX cluster
-def createKustoConnection(uri, tenantID, appID, appKey):
-    connectionString = None
+def create_kusto_connection(uri, tenant_ID, app_ID, app_key):
+    connection_string = None
     try:
-        connectionString = KustoConnectionStringBuilder.with_aad_application_key_authentication(uri, appID, appKey, tenantID)
+        connection_string = KustoConnectionStringBuilder.with_aad_application_key_authentication(uri, app_ID, app_key, tenant_ID)
     except Exception as e:
         logging.error("Could not create a connection string:%s"%e)
-    return connectionString
+    return connection_string
 
 # Instantiante Kusto client
-def getKustoClient(kcsb):
+def get_kusto_client(kcsb):
     client = None
     try:
         client = KustoIngestClient(kcsb)
@@ -26,17 +26,17 @@ def getKustoClient(kcsb):
     return client
 
 # From a blob name, gets file format, destination table and ingestion mapping using the mappings file
-def getMappingsBlob(blobName,filePath):
+def get_mappings_blob(blob_name,filePath):
     try:
         with open(filePath, 'r') as f:
             mappings = json.load(f)
-        namePattern = blobName.split('-')[0]
-        return (mappings[namePattern]["format"], mappings[namePattern]["ingestionMapping"], mappings[namePattern]["table"])
+        name_pattern = blob_name.split('-')[0]
+        return (mappings[name_pattern]["format"], mappings[name_pattern]["ingestionMapping"], mappings[name_pattern]["table"])
     except Exception as e:
         logging.error("Error mapping file name to format, table and ingestion mapping: %s"%e)
 
 # Ingests blob to ADX
-def ingestBlob(client,db,blob,properties):
+def ingest_blob(client,db,blob,properties):
     INGESTION_PROPERTIES = IngestionProperties(database=db, table=blob['table'], dataFormat=DataFormat(blob['format']), mappingReference=blob['ingestionMapping'], additionalProperties=properties, reportLevel=ReportLevel.FailuresAndSuccesses)
     BLOB_DESCRIPTOR = BlobDescriptor(blob['path'],blob['size'])
     try:
@@ -47,7 +47,7 @@ def ingestBlob(client,db,blob,properties):
 
 # Queries ADX
 # Not used here
-def queryKusto(query,client, database):
+def query_kusto(query,client, database):
     try:
         response = client.execute_query(database, query)
         logging.info("Query reponse: %s" % str(response))
@@ -56,45 +56,45 @@ def queryKusto(query,client, database):
         logging.error("Could not process query:%s"%e)
 
 # Gets status queue of ADX cluster
-def getStatusQueue(client):
-    statusQueue = None
+def get_status_queue(client):
+    status_queue = None
     try:
-        statusQueue = KustoIngestStatusQueues(client)
+        status_queue = KustoIngestStatusQueues(client)
         logging.info("Initialized status queue successfully.")
     except Exception as e:
         logging.error("Error initializing status queue:%s"%e)
-    return statusQueue
+    return status_queue
 
 # Checks if a queue is empty
-def isQueueEmpty(queue):
+def is_queue_empty(queue):
     return queue.is_empty()
 
 # From a blob path, gets the name of a blob and the name of its container
-def getBlobInfo(path):
+def get_blob_info(path):
     parts = path.split('/')
-    blobName = parts[-1]
-    containerName = parts[-2]
-    return blobName, containerName
+    blob_name = parts[-1]
+    container_name = parts[-2]
+    return blob_name, container_name
 
 # Empties a queue
-def emptyQueue(queue):
-    messageList = []
+def empty_queue(queue):
+    message_list = []
     try:
-        firstMessage = queue.pop()
-        blobName, containerName = getBlobInfo(firstMessage[0].IngestionSourcePath)
-        logging.info("First message in the queue: Blob '%s'"%blobName)
-        newContainerName = containerName
-        for message in firstMessage:
-            messageList.append(message)
+        first_message = queue.pop()
+        blob_name, container_name = get_blob_info(first_message[0].IngestionSourcePath)
+        logging.info("First message in the queue: Blob '%s'"%blob_name)
+        new_container_name = container_name
+        for message in first_message:
+            message_list.append(message)
         # while the partition key (container name) is the same and the list length is < 100 (max batch size: 100), we continue adding to the list
-        while(queue.is_empty() == False and len(messageList) < 100 and newContainerName == containerName):
-            newMessage = queue.peek()
-            blobName, newContainerName = getBlobInfo(newMessage[0].IngestionSourcePath)
-            if(newContainerName == containerName):
-                newMessage = queue.pop()
-                for message in newMessage:
-                    messageList.append(message)
+        while(queue.is_empty() == False and len(message_list) < 100 and new_container_name == container_name):
+            new_message = queue.peek()
+            blob_name, new_container_name = get_blob_info(new_message[0].IngestionSourcePath)
+            if(new_container_name == container_name):
+                new_message = queue.pop()
+                for message in new_message:
+                    message_list.append(message)
         logging.info("A batch of messages was removed from the queue.")
     except Exception as e:
         logging.error("There was an error while emptying the queue:%s"%e)
-    return messageList
+    return message_list

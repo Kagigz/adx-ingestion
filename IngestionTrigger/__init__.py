@@ -19,40 +19,40 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     STATUS_TABLE = os.environ['STATUS_TABLE']
     UPLOAD_QUEUE = os.environ['UPLOAD_QUEUE']
 
-    blobService = storage_helpers.createBlobService(STORAGE_NAME,STORAGE_KEY)
-    queueService = storage_helpers.createQueueService(STORAGE_NAME,STORAGE_KEY)
-    tableService = storage_helpers.createTableService(STORAGE_NAME,STORAGE_KEY)
+    blob_service = storage_helpers.create_blob_service(STORAGE_NAME,STORAGE_KEY)
+    queue_service = storage_helpers.create_queue_service(STORAGE_NAME,STORAGE_KEY)
+    table_service = storage_helpers.create_table_service(STORAGE_NAME,STORAGE_KEY)
 
-    if(blobService != None and queueService != None and tableService != None):
+    if(blob_service != None and queue_service != None and table_service != None):
 
         print("OK")
-        blobGenerator = storage_helpers.listBlobs(blobService,CONTAINER)        
+        blob_generator = storage_helpers.list_blobs(blob_service,CONTAINER)        
         # creating a blob list
-        blobs = storage_helpers.generateBlobList(blobGenerator,CONTAINER,STORAGE_NAME,SAS_TOKEN)
-        blobsToIngest = []
+        blobs = storage_helpers.generate_blob_list(blob_generator,CONTAINER,STORAGE_NAME,SAS_TOKEN)
+        blobs_to_ingest = []
 
         for blob in blobs:
             # Check if blob was already ingested or not with the status table
             # The partition key is the container name and the row key is the blob name 
             status = "NotFound"
-            blobStatus = storage_helpers.queryEntity(tableService,STATUS_TABLE,CONTAINER,blob['name'])
-            if(blobStatus != None):
-                status = blobStatus
+            blob_status = storage_helpers.query_entity(table_service,STATUS_TABLE,CONTAINER,blob['name'])
+            if(blob_status != None):
+                status = blob_status
             # If the blob was never ingested or the ingestion failed, we want to ingest it
             if(status == 'NotFound' or status == 'failure'):
-                blobsToIngest.append(blob)
-                storage_helpers.addToQueue(queueService,UPLOAD_QUEUE,storage_helpers.createQueueMessage(blob))
+                blobs_to_ingest.append(blob)
+                storage_helpers.add_to_queue(queue_service,UPLOAD_QUEUE,storage_helpers.create_queue_message(blob))
                 # Update status of blob to "queued"
-                newBlobStatus = {'PartitionKey': CONTAINER, 'RowKey': blob['name'], 'status' : 'queued'}
-                storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
+                newblob_status = {'PartitionKey': CONTAINER, 'RowKey': blob['name'], 'status' : 'queued'}
+                storage_helpers.insert_or_merge_entity(table_service,STATUS_TABLE,newblob_status)
             
         logging.info("%d blobs found in %s" % (len(blobs),CONTAINER))
-        logging.info("%d blobs to ingest in %s" % (len(blobsToIngest),CONTAINER))
+        logging.info("%d blobs to ingest in %s" % (len(blobs_to_ingest),CONTAINER))
 
     else:
         logging.warning("Could not trigger the ingestion process.")
 
-    if blobService:
+    if blob_service:
         return func.HttpResponse(f"OK",status_code=200)
     else:
         return func.HttpResponse(

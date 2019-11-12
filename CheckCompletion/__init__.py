@@ -22,44 +22,44 @@ def main(mytimer: func.TimerRequest) -> None:
     STORAGE_KEY = os.environ['STORAGE_ACCOUNT_KEY']
     STATUS_TABLE = os.environ['STATUS_TABLE']
 
-    ingestKCSB = kusto_helpers.createKustoConnection(INGEST_URI,AAD_TENANT_ID, APPLICATION_ID, APPLICATION_SECRET)
+    ingest_KCSB = kusto_helpers.create_kusto_connection(INGEST_URI,AAD_TENANT_ID, APPLICATION_ID, APPLICATION_SECRET)
 
-    tableService = storage_helpers.createTableService(STORAGE_NAME,STORAGE_KEY)
+    table_service = storage_helpers.create_table_service(STORAGE_NAME,STORAGE_KEY)
 
-    kustoClient = None
-    if(ingestKCSB != None):
-        kustoClient = kusto_helpers.getKustoClient(ingestKCSB)
-        statusQueue = kusto_helpers.getStatusQueue(kustoClient)
+    kusto_client = None
+    if(ingest_KCSB != None):
+        kusto_client = kusto_helpers.get_kusto_client(ingest_KCSB)
+        status_queue = kusto_helpers.get_status_queue(kusto_client)
 
-        if(kustoClient != None and tableService != None and statusQueue != None):
+        if(kusto_client != None and table_service != None and status_queue != None):
 
                 # Checking success queue to see if ingestion of blobs succeeded
-                if(kusto_helpers.isQueueEmpty(statusQueue.success) == True):
+                if(kusto_helpers.is_queue_empty(status_queue.success) == True):
                     logging.info("Ingestion success queue is empty.")
                 else:
                     logging.info("Ingestion success queue contains new messages.")
-                    successMessagesList = kusto_helpers.emptyQueue(statusQueue.success)
+                    success_messages_list = kusto_helpers.empty_queue(status_queue.success)
 
                     # updating the successfully ingested blobs
-                    for successMessage in successMessagesList:
+                    for success_message in success_messages_list:
                         print("Success Message: ")
-                        print(successMessage)
-                        blobName, containerName = kusto_helpers.getBlobInfo(successMessage.IngestionSourcePath)
+                        print(success_message)
+                        blob_name, container_name = kusto_helpers.get_blob_info(success_message.IngestionSourcePath)
                         # Update status table with success status
-                        newBlobStatus = {'PartitionKey': containerName, 'RowKey': blobName, 'status' : 'success'}
-                        storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
+                        new_blob_status = {'PartitionKey': container_name, 'RowKey': blob_name, 'status' : 'success'}
+                        storage_helpers.insert_or_merge_entity(table_service,STATUS_TABLE,new_blob_status)
 
                 # Checking failure queue to see if ingestion failed for some blobs
-                if(kusto_helpers.isQueueEmpty(statusQueue.failure) == False):
+                if(kusto_helpers.is_queue_empty(status_queue.failure) == False):
                     logging.warning("There are new messages in the Ingestion failure queue.")
-                    failureMessagesList = kusto_helpers.emptyQueue(statusQueue.failure)
+                    failure_messages_list = kusto_helpers.empty_queue(status_queue.failure)
 
                     # updating the blobs whose ingestion failed
-                    for failureMessage in failureMessagesList:
-                        blobName, containerName = kusto_helpers.getBlobInfo(failureMessage.IngestionSourcePath)
+                    for failureMessage in failure_messages_list:
+                        blob_name, container_name = kusto_helpers.get_blob_info(failureMessage.IngestionSourcePath)
                         # Update status table with failure status
-                        newBlobStatus = {'PartitionKey': containerName, 'RowKey': blobName, 'status' : 'failure'}
-                        storage_helpers.insertOrMergeEntity(tableService,STATUS_TABLE,newBlobStatus)
+                        new_blob_status = {'PartitionKey': container_name, 'RowKey': blob_name, 'status' : 'failure'}
+                        storage_helpers.insert_or_merge_entity(table_service,STATUS_TABLE,new_blob_status)
         
         else:
             logging.warning("Could not check if ingestion was completed.")
