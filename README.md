@@ -34,6 +34,7 @@ Ingestion of blobs to ADX can take a few minutes, so we want to check that the n
 
 - Create a table (for status updates), a queue (for ingestion queue), and a blob container (for your data) in your storage account
 - Add data in your container - you can use the data folder in this repo for sample data
+- Create a blob container called "settings" and upload the *mappings.json* file to it
 - Create a table in your database
 ```
 CREATE_TABLE_COMMAND = ".create table TrafficFlows (FlowID: string, SourceIP: string, DestinationIP: string, DestinationPort: int, Timestamp: string, FlowDuration: int)"
@@ -71,7 +72,7 @@ These are the environment variables you should configure before running this app
     "DATA_CONTAINER":"data",
     "STATUS_TABLE": "status",
     "UPLOAD_QUEUE":"uploadqueue",
-    "MAPPINGS_FILE": "mappings.json"
+    "MAPPINGS_FILE": "settings/mappings.json"
   }
 }
 ```
